@@ -17,7 +17,7 @@ export default async function OnboardingPage() {
     .maybeSingle();
 
   if (profile) {
-    redirect("/private");
+    redirect("/dashboard");
   }
 
   return <OnboardingForms />;

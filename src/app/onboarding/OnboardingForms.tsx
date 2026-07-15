@@ -1,71 +1,90 @@
 "use client";
 
 import { useActionState } from "react";
+import { motion } from "motion/react";
 import { createOrganization, joinOrganization } from "@/app/actions/organizations";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function OnboardingForms() {
   const [createState, createAction, createPending] = useActionState(
     createOrganization,
     undefined,
   );
-  const [joinState, joinAction, joinPending] = useActionState(
-    joinOrganization,
-    undefined,
-  );
+  const [joinState, joinAction, joinPending] = useActionState(joinOrganization, undefined);
 
   return (
-    <div className="flex flex-1 items-center justify-center bg-zinc-50 dark:bg-black">
-      <div className="flex w-full max-w-sm flex-col gap-8">
-        <form
-          action={createAction}
-          className="flex flex-col gap-4 rounded-lg border border-black/[.08] bg-white p-8 dark:border-white/[.145] dark:bg-zinc-950"
-        >
-          <h2 className="text-lg font-semibold text-black dark:text-zinc-50">
-            Create an organization
-          </h2>
-          <input
-            name="name"
-            placeholder="Organization name"
-            required
-            className="rounded border border-black/[.08] px-3 py-2 dark:border-white/[.145] dark:bg-black dark:text-zinc-50"
-          />
-          {createState?.error && (
-            <p className="text-sm text-red-600 dark:text-red-400">{createState.error}</p>
-          )}
-          <button
-            type="submit"
-            disabled={createPending}
-            className="rounded-full bg-foreground px-5 py-2 text-background transition-colors hover:bg-[#383838] disabled:opacity-50 dark:hover:bg-[#ccc]"
-          >
-            {createPending ? "Creating..." : "Create"}
-          </button>
-        </form>
-
-        <form
-          action={joinAction}
-          className="flex flex-col gap-4 rounded-lg border border-black/[.08] bg-white p-8 dark:border-white/[.145] dark:bg-zinc-950"
-        >
-          <h2 className="text-lg font-semibold text-black dark:text-zinc-50">
-            Join an organization
-          </h2>
-          <input
-            name="code"
-            placeholder="Invite code"
-            required
-            className="rounded border border-black/[.08] px-3 py-2 uppercase dark:border-white/[.145] dark:bg-black dark:text-zinc-50"
-          />
-          {joinState?.error && (
-            <p className="text-sm text-red-600 dark:text-red-400">{joinState.error}</p>
-          )}
-          <button
-            type="submit"
-            disabled={joinPending}
-            className="rounded-full border border-black/[.08] px-5 py-2 transition-colors hover:bg-black/[.04] disabled:opacity-50 dark:border-white/[.145] dark:hover:bg-[#1a1a1a]"
-          >
-            {joinPending ? "Joining..." : "Join"}
-          </button>
-        </form>
-      </div>
+    <div className="flex flex-1 items-center justify-center px-4">
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35, ease: "easeOut" }}
+        className="w-full max-w-sm"
+      >
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-xl">Get started</CardTitle>
+            <CardDescription>
+              Create a new organization, or join one with an invite code
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Tabs defaultValue="create">
+              <TabsList className="w-full">
+                <TabsTrigger value="create" className="flex-1">
+                  Create
+                </TabsTrigger>
+                <TabsTrigger value="join" className="flex-1">
+                  Join
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="create" className="mt-4">
+                <form action={createAction} className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="name">Organization name</Label>
+                    <Input id="name" name="name" required placeholder="Acme Inc." />
+                  </div>
+                  {createState?.error && (
+                    <p className="text-sm text-destructive">{createState.error}</p>
+                  )}
+                  <Button type="submit" disabled={createPending} className="w-full">
+                    {createPending ? "Creating..." : "Create organization"}
+                  </Button>
+                </form>
+              </TabsContent>
+              <TabsContent value="join" className="mt-4">
+                <form action={joinAction} className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-2">
+                    <Label htmlFor="code">Invite code</Label>
+                    <Input
+                      id="code"
+                      name="code"
+                      required
+                      placeholder="A1B2C3D4"
+                      className="uppercase"
+                    />
+                  </div>
+                  {joinState?.error && (
+                    <p className="text-sm text-destructive">{joinState.error}</p>
+                  )}
+                  <Button type="submit" disabled={joinPending} className="w-full">
+                    {joinPending ? "Joining..." : "Join organization"}
+                  </Button>
+                </form>
+              </TabsContent>
+            </Tabs>
+          </CardContent>
+        </Card>
+      </motion.div>
     </div>
   );
 }

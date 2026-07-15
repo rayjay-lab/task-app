@@ -1,7 +1,33 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { toast } from "sonner";
+import { Calendar, Pencil, Trash2 } from "lucide-react";
 import { updateTaskStatus, updateTask, deleteTask } from "@/app/actions/tasks";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 type Person = { email: string };
 type Member = { id: string; email: string };
@@ -23,9 +49,6 @@ function oneOf<T>(value: T | T[] | null): T | null {
   return Array.isArray(value) ? (value[0] ?? null) : value;
 }
 
-const fieldClass =
-  "rounded border border-black/[.08] px-3 py-2 dark:border-white/[.145] dark:bg-black dark:text-zinc-50";
-
 export default function TaskRow({
   task,
   currentUserId,
@@ -38,6 +61,7 @@ export default function TaskRow({
   members: Member[];
 }) {
   const [isEditing, setIsEditing] = useState(false);
+  const [isPending, startTransition] = useTransition();
   const assignee = oneOf(task.assignee);
   const assigner = oneOf(task.assigner);
   const canToggle = isManager || task.assigned_to === currentUserId;
@@ -45,124 +69,173 @@ export default function TaskRow({
   const today = new Date().toISOString().slice(0, 10);
   const isOverdue = task.status === "open" && !!task.due_date && task.due_date < today;
 
+  function toggleStatus() {
+    startTransition(async () => {
+      const fd = new FormData();
+      fd.set("task_id", task.id);
+      fd.set("status", nextStatus);
+      await updateTaskStatus(fd);
+      toast.success(nextStatus === "done" ? "Task marked done" : "Task reopened");
+    });
+  }
+
+  function handleDelete() {
+    startTransition(async () => {
+      const fd = new FormData();
+      fd.set("task_id", task.id);
+      await deleteTask(fd);
+      toast.success("Task deleted");
+    });
+  }
+
   if (isEditing) {
     return (
-      <form
-        action={async (formData) => {
-          await updateTask(formData);
-          setIsEditing(false);
-        }}
-        className="flex flex-col gap-3 rounded-lg border border-black/[.08] bg-white p-4 dark:border-white/[.145] dark:bg-zinc-950"
-      >
-        <input type="hidden" name="task_id" value={task.id} />
-        <input name="title" defaultValue={task.title} required className={fieldClass} />
-        <textarea
-          name="description"
-          defaultValue={task.description ?? ""}
-          rows={2}
-          className={fieldClass}
-        />
-        <div className="flex gap-4">
-          <select
-            name="assigned_to"
-            defaultValue={task.assigned_to ?? ""}
-            required
-            className={`flex-1 ${fieldClass}`}
+      <Card>
+        <CardContent>
+          <form
+            action={(formData) => {
+              startTransition(async () => {
+                await updateTask(formData);
+                toast.success("Task updated");
+                setIsEditing(false);
+              });
+            }}
+            className="flex flex-col gap-3"
           >
-            {members.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.email}
-              </option>
-            ))}
-          </select>
-          <input type="date" name="due_date" defaultValue={task.due_date ?? ""} className={fieldClass} />
-        </div>
-        <div className="flex gap-2">
-          <button
-            type="submit"
-            className="rounded-full bg-foreground px-4 py-1 text-sm text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc]"
-          >
-            Save
-          </button>
-          <button
-            type="button"
-            onClick={() => setIsEditing(false)}
-            className="rounded-full border border-black/[.08] px-4 py-1 text-sm transition-colors hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a]"
-          >
-            Cancel
-          </button>
-        </div>
-      </form>
+            <input type="hidden" name="task_id" value={task.id} />
+            <div className="flex flex-col gap-2">
+              <Label htmlFor={`title-${task.id}`}>Title</Label>
+              <Input id={`title-${task.id}`} name="title" defaultValue={task.title} required />
+            </div>
+            <div className="flex flex-col gap-2">
+              <Label htmlFor={`description-${task.id}`}>Description</Label>
+              <Textarea
+                id={`description-${task.id}`}
+                name="description"
+                defaultValue={task.description ?? ""}
+                rows={2}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex flex-col gap-2">
+                <Label htmlFor={`assigned_to-${task.id}`}>Assign to</Label>
+                <Select name="assigned_to" defaultValue={task.assigned_to ?? undefined} required>
+                  <SelectTrigger id={`assigned_to-${task.id}`} className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {members.map((m) => (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.email}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col gap-2">
+                <Label htmlFor={`due_date-${task.id}`}>Due date</Label>
+                <Input
+                  id={`due_date-${task.id}`}
+                  name="due_date"
+                  type="date"
+                  defaultValue={task.due_date ?? ""}
+                />
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button type="submit" size="sm" disabled={isPending}>
+                Save
+              </Button>
+              <Button type="button" size="sm" variant="outline" onClick={() => setIsEditing(false)}>
+                Cancel
+              </Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
     );
   }
 
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-black/[.08] bg-white p-4 dark:border-white/[.145] dark:bg-zinc-950">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="font-medium text-black dark:text-zinc-50">{task.title}</p>
-          {task.description && (
-            <p className="text-sm text-zinc-600 dark:text-zinc-400">{task.description}</p>
-          )}
+    <Card>
+      <CardContent className="flex flex-col gap-3">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p className="font-medium">{task.title}</p>
+            {task.description && (
+              <p className="mt-0.5 text-sm text-muted-foreground">{task.description}</p>
+            )}
+          </div>
+          <div className="flex shrink-0 gap-1.5">
+            {isOverdue && <Badge variant="destructive">Overdue</Badge>}
+            <Badge variant={task.status === "done" ? "secondary" : "outline"}>{task.status}</Badge>
+          </div>
         </div>
-        <div className="flex shrink-0 gap-2">
-          {isOverdue && (
-            <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-medium text-red-800 dark:bg-red-900 dark:text-red-200">
-              Overdue
+
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+          <span>To: {assignee?.email ?? "—"}</span>
+          <span>By: {assigner?.email ?? "—"}</span>
+          {task.due_date && (
+            <span className="flex items-center gap-1">
+              <Calendar className="size-3" />
+              {task.due_date}
             </span>
           )}
-          <span
-            className={`rounded-full px-3 py-1 text-xs font-medium ${
-              task.status === "done"
-                ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
-                : "bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-200"
-            }`}
-          >
-            {task.status}
-          </span>
         </div>
-      </div>
 
-      <div className="flex flex-wrap gap-x-4 text-xs text-zinc-600 dark:text-zinc-400">
-        <span>Assigned to: {assignee?.email ?? "—"}</span>
-        <span>Assigned by: {assigner?.email ?? "—"}</span>
-        {task.due_date && <span>Due: {task.due_date}</span>}
-      </div>
-
-      <div className="flex gap-2">
-        {canToggle && (
-          <form action={updateTaskStatus}>
-            <input type="hidden" name="task_id" value={task.id} />
-            <input type="hidden" name="status" value={nextStatus} />
-            <button
-              type="submit"
-              className="rounded-full border border-black/[.08] px-4 py-1 text-sm transition-colors hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a]"
-            >
+        <div className="flex gap-2">
+          {canToggle && (
+            <Button size="sm" variant="outline" disabled={isPending} onClick={toggleStatus}>
               Mark as {nextStatus}
-            </button>
-          </form>
-        )}
-        {isManager && (
-          <>
-            <button
-              type="button"
-              onClick={() => setIsEditing(true)}
-              className="rounded-full border border-black/[.08] px-4 py-1 text-sm transition-colors hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a]"
-            >
-              Edit
-            </button>
-            <form action={deleteTask}>
-              <input type="hidden" name="task_id" value={task.id} />
-              <button
-                type="submit"
-                className="rounded-full border border-red-200 px-4 py-1 text-sm text-red-700 transition-colors hover:bg-red-50 dark:border-red-900 dark:text-red-400 dark:hover:bg-red-950"
+            </Button>
+          )}
+          {isManager && (
+            <>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="size-8"
+                onClick={() => setIsEditing(true)}
               >
-                Delete
-              </button>
-            </form>
-          </>
-        )}
-      </div>
-    </div>
+                <Pencil className="size-4" />
+                <span className="sr-only">Edit</span>
+              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger
+                  render={
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="size-8 text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="size-4" />
+                      <span className="sr-only">Delete</span>
+                    </Button>
+                  }
+                />
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete this task?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      &ldquo;{task.title}&rdquo; will be permanently deleted. This can&apos;t be
+                      undone.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleDelete}
+                      className="bg-destructive text-white hover:bg-destructive/90"
+                    >
+                      Delete
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }

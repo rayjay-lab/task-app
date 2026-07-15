@@ -20,7 +20,7 @@ export async function login(
     return { error: error.message };
   }
 
-  redirect("/private");
+  redirect("/dashboard");
 }
 
 export async function signup(
@@ -38,7 +38,7 @@ export async function signup(
     return { error: error.message };
   }
 
-  redirect("/private");
+  redirect("/dashboard");
 }
 
 export async function logout() {

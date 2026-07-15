@@ -19,7 +19,7 @@ export async function createOrganization(
     return { error: error.message };
   }
 
-  redirect("/private");
+  redirect("/dashboard");
 }
 
 export async function joinOrganization(
@@ -36,5 +36,5 @@ export async function joinOrganization(
     return { error: error.message };
   }
 
-  redirect("/private");
+  redirect("/dashboard");
 }
