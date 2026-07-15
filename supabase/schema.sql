@@ -147,3 +147,100 @@ end;
 $$;
 
 grant execute on function public.join_organization(text) to authenticated;
+
+-- Stage 2: task creation/assignment.
+
+-- Add email so the UI can show "who's who" when assigning tasks.
+alter table profiles add column if not exists email text;
+
+update profiles p
+set email = u.email
+from auth.users u
+where p.id = u.id and p.email is null;
+
+alter table profiles alter column email set not null;
+
+create or replace function public.create_organization(org_name text)
+returns organizations
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  new_org organizations;
+begin
+  if exists (select 1 from profiles where id = auth.uid()) then
+    raise exception 'You already belong to an organization';
+  end if;
+
+  insert into organizations (name, invite_code)
+  values (org_name, generate_invite_code())
+  returning * into new_org;
+
+  insert into profiles (id, organization_id, role, email)
+  values (auth.uid(), new_org.id, 'manager', (select email from auth.users where id = auth.uid()));
+
+  return new_org;
+end;
+$$;
+
+create or replace function public.join_organization(code text)
+returns organizations
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  target_org organizations;
+begin
+  if exists (select 1 from profiles where id = auth.uid()) then
+    raise exception 'You already belong to an organization';
+  end if;
+
+  select * into target_org from organizations where invite_code = upper(code);
+
+  if target_org.id is null then
+    raise exception 'Invalid invite code';
+  end if;
+
+  insert into profiles (id, organization_id, role, email)
+  values (auth.uid(), target_org.id, 'member', (select email from auth.users where id = auth.uid()));
+
+  return target_org;
+end;
+$$;
+
+-- Returns the caller's role, for use in RLS policies.
+create or replace function public.current_user_role()
+returns text
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select role from profiles where id = auth.uid()
+$$;
+
+grant execute on function public.current_user_role() to authenticated;
+
+-- Managers can create tasks in their own org, assigned by themselves.
+create policy "managers insert org tasks" on tasks
+  for insert to authenticated
+  with check (
+    organization_id = current_user_org_id()
+    and assigned_by = auth.uid()
+    and current_user_role() = 'manager'
+  );
+
+-- The assignee or a manager can update a task (e.g. mark done).
+-- Note: this allows updating any column, not just status -- our app only
+-- ever sends status changes, but this isn't enforced at the column level.
+create policy "assignee or manager updates task" on tasks
+  for update to authenticated
+  using (
+    organization_id = current_user_org_id()
+    and (assigned_to = auth.uid() or current_user_role() = 'manager')
+  )
+  with check (
+    organization_id = current_user_org_id()
+  );

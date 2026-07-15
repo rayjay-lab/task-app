@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/utils/supabase/server";
 import { logout } from "@/app/actions/auth";
 
@@ -41,10 +42,16 @@ export default async function PrivatePage() {
             Invite code: <span className="font-mono font-medium">{org?.invite_code}</span>
           </p>
         )}
+        <Link
+          href="/tasks"
+          className="rounded-full bg-foreground px-5 py-2 text-center text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc]"
+        >
+          View tasks
+        </Link>
         <form action={logout}>
           <button
             type="submit"
-            className="rounded-full border border-black/[.08] px-5 py-2 transition-colors hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a]"
+            className="w-full rounded-full border border-black/[.08] px-5 py-2 transition-colors hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a]"
           >
             Log out
           </button>
