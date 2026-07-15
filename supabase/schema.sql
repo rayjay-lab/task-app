@@ -244,3 +244,13 @@ create policy "assignee or manager updates task" on tasks
   with check (
     organization_id = current_user_org_id()
   );
+
+-- Stage 3: task edit/delete + members view.
+
+-- Managers can delete tasks in their own org.
+create policy "managers delete org tasks" on tasks
+  for delete to authenticated
+  using (
+    organization_id = current_user_org_id()
+    and current_user_role() = 'manager'
+  );

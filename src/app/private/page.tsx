@@ -37,16 +37,17 @@ export default async function PrivatePage() {
         <p className="text-sm text-zinc-600 dark:text-zinc-400">
           Role: <span className="font-medium capitalize">{profile.role}</span>
         </p>
-        {profile.role === "manager" && (
-          <p className="text-sm text-zinc-600 dark:text-zinc-400">
-            Invite code: <span className="font-mono font-medium">{org?.invite_code}</span>
-          </p>
-        )}
         <Link
           href="/tasks"
           className="rounded-full bg-foreground px-5 py-2 text-center text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc]"
         >
           View tasks
+        </Link>
+        <Link
+          href="/members"
+          className="rounded-full border border-black/[.08] px-5 py-2 text-center transition-colors hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a]"
+        >
+          View members
         </Link>
         <form action={logout}>
           <button

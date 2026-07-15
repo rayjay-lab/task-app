@@ -54,3 +54,29 @@ export async function updateTaskStatus(formData: FormData) {
 
   revalidatePath("/tasks");
 }
+
+export async function updateTask(formData: FormData) {
+  const supabase = await createClient();
+
+  const dueDate = formData.get("due_date") as string;
+
+  await supabase
+    .from("tasks")
+    .update({
+      title: formData.get("title") as string,
+      description: (formData.get("description") as string) || null,
+      assigned_to: formData.get("assigned_to") as string,
+      due_date: dueDate || null,
+    })
+    .eq("id", formData.get("task_id") as string);
+
+  revalidatePath("/tasks");
+}
+
+export async function deleteTask(formData: FormData) {
+  const supabase = await createClient();
+
+  await supabase.from("tasks").delete().eq("id", formData.get("task_id") as string);
+
+  revalidatePath("/tasks");
+}
