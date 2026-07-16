@@ -254,3 +254,105 @@ create policy "managers delete org tasks" on tasks
     organization_id = current_user_org_id()
     and current_user_role() = 'manager'
   );
+
+-- Stage 4: member management (remove, promote/demote).
+
+-- Removing a member should keep their past tasks, just unassign them,
+-- rather than blocking removal or deleting task history.
+alter table tasks drop constraint tasks_assigned_to_fkey;
+alter table tasks add constraint tasks_assigned_to_fkey
+  foreign key (assigned_to) references profiles (id) on delete set null;
+
+alter table tasks drop constraint tasks_assigned_by_fkey;
+alter table tasks add constraint tasks_assigned_by_fkey
+  foreign key (assigned_by) references profiles (id) on delete set null;
+
+-- Removes a member from the org. Managers only; can't remove yourself;
+-- can't remove the last manager (would leave the org unmanageable).
+create or replace function public.remove_member(target_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  target_org uuid;
+  target_role text;
+  manager_count int;
+begin
+  if current_user_role() <> 'manager' then
+    raise exception 'Only managers can remove members';
+  end if;
+
+  if target_id = auth.uid() then
+    raise exception 'You cannot remove yourself';
+  end if;
+
+  select organization_id, role into target_org, target_role
+  from profiles where id = target_id;
+
+  if target_org is null or target_org <> current_user_org_id() then
+    raise exception 'Member not found in your organization';
+  end if;
+
+  if target_role = 'manager' then
+    select count(*) into manager_count from profiles
+    where organization_id = target_org and role = 'manager';
+
+    if manager_count <= 1 then
+      raise exception 'Cannot remove the last manager';
+    end if;
+  end if;
+
+  delete from profiles where id = target_id;
+end;
+$$;
+
+grant execute on function public.remove_member(uuid) to authenticated;
+
+-- Promotes/demotes a member. Managers only; can't change your own role;
+-- can't demote the last manager.
+create or replace function public.update_member_role(target_id uuid, new_role text)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  target_org uuid;
+  target_role text;
+  manager_count int;
+begin
+  if new_role not in ('manager', 'member') then
+    raise exception 'Invalid role';
+  end if;
+
+  if current_user_role() <> 'manager' then
+    raise exception 'Only managers can change roles';
+  end if;
+
+  if target_id = auth.uid() then
+    raise exception 'You cannot change your own role';
+  end if;
+
+  select organization_id, role into target_org, target_role
+  from profiles where id = target_id;
+
+  if target_org is null or target_org <> current_user_org_id() then
+    raise exception 'Member not found in your organization';
+  end if;
+
+  if target_role = 'manager' and new_role = 'member' then
+    select count(*) into manager_count from profiles
+    where organization_id = target_org and role = 'manager';
+
+    if manager_count <= 1 then
+      raise exception 'Cannot demote the last manager';
+    end if;
+  end if;
+
+  update profiles set role = new_role where id = target_id;
+end;
+$$;
+
+grant execute on function public.update_member_role(uuid, text) to authenticated;

@@ -52,7 +52,11 @@ export default async function MembersPage() {
           </Card>
         )}
 
-        <MemberList members={members ?? []} />
+        <MemberList
+          members={members ?? []}
+          currentUserId={userData.user.id}
+          isManager={profile.role === "manager"}
+        />
       </main>
     </div>
   );
